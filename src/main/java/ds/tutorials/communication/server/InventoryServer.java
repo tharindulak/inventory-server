@@ -15,15 +15,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class BankServer {
+public class InventoryServer {
     private DistributedLock leaderLock;
     private AtomicBoolean isLeader = new AtomicBoolean(false);
     private byte[] leaderData;
     private int serverPort;
-    private Map<String, Double> accounts = new HashMap();
+    private Map<String, Double> items = new HashMap();
     private DistributedTx transaction;
-    private SetBalanceServiceImpl setBalanceService;
-    private CheckBalanceServiceImpl checkBalanceService;
+    private SetItemQuantityServiceImpl setQuantityService;
+    private CheckItemDetailsServiceImpl checkQuantityService;
 
     public static String buildServerData(String IP, int port) {
         StringBuilder builder = new StringBuilder();
@@ -31,12 +31,12 @@ public class BankServer {
         return builder.toString();
     }
 
-    public BankServer(String host, int port) throws InterruptedException, IOException, KeeperException {
+    public InventoryServer(String host, int port) throws InterruptedException, IOException, KeeperException {
         this.serverPort = port;
-        leaderLock = new DistributedLock("BankServerDisTsx", buildServerData(host, port));
-        setBalanceService = new SetBalanceServiceImpl(this);
-        checkBalanceService = new CheckBalanceServiceImpl(this);
-        transaction = new DistributedTxParticipant(setBalanceService);
+        leaderLock = new DistributedLock("InventoryServerDisTsx", buildServerData(host, port));
+        setQuantityService = new SetItemQuantityServiceImpl(this);
+        checkQuantityService = new CheckItemDetailsServiceImpl(this);
+        transaction = new DistributedTxParticipant(setQuantityService);
     }
 
     public DistributedTx getTransaction() {
@@ -51,11 +51,11 @@ public class BankServer {
     public void startServer() throws IOException, InterruptedException, KeeperException {
         Server server = ServerBuilder
                 .forPort(serverPort)
-                .addService(checkBalanceService)
-                .addService(setBalanceService)
+                .addService(checkQuantityService)
+                .addService(setQuantityService)
                 .build();
         server.start();
-        System.out.println("BankServer Started and ready to accept requests on port " + serverPort);
+        System.out.println("Inventory system Started and ready to accept requests on port " + serverPort);
 
         tryToBeLeader();
         server.awaitTermination();
@@ -74,11 +74,11 @@ public class BankServer {
     }
 
     public void setAccountBalance(String accountId, double value) {
-        accounts.put(accountId, value);
+        items.put(accountId, value);
     }
 
     public double getAccountBalance(String accountId) {
-        Double value = accounts.get(accountId);
+        Double value = items.get(accountId);
         return (value != null) ? value : 0.0;
     }
 
@@ -121,9 +121,9 @@ public class BankServer {
     }
 
     private void beTheLeader() {
-        System.out.println("I got the leader lock. Now actingas primary");
+        System.out.println("I got the leader lock. Now acting as primary");
         isLeader.set(true);
-        transaction = new DistributedTxCoordinator(setBalanceService);
+        transaction = new DistributedTxCoordinator(setQuantityService);
     }
 
     public static void main(String[] args) throws Exception {
@@ -135,7 +135,7 @@ public class BankServer {
         int serverPort = Integer.parseInt(args[0]);
         DistributedLock.setZooKeeperURL("localhost:2181");
 
-        BankServer server = new BankServer("localhost", serverPort);
+        InventoryServer server = new InventoryServer("localhost", serverPort);
         server.startServer();
     }
 }

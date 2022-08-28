@@ -84,7 +84,7 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>ds.tutorials.communication.server.BankServer</mainClass>
+                            <mainClass>ds.tutorials.communication.server.InventoryServer</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

@@ -1,8 +1,8 @@
 package ds.tutorials.communication.server;
 
-import ds.tutorial.communication.grpc.generated.SetBalanceRequest;
-import ds.tutorial.communication.grpc.generated.SetBalanceResponse;
-import ds.tutorial.communication.grpc.generated.SetBalanceServiceGrpc;
+import ds.tutorial.communication.grpc.generated.SetQuantityRequest;
+import ds.tutorial.communication.grpc.generated.SetQuantityResponse;
+import ds.tutorial.communication.grpc.generated.SetQuantityServiceGrpc;
 import ds.tutorials.sycnhronization.DistributedTxCoordinator;
 import ds.tutorials.sycnhronization.DistributedTxListener;
 import ds.tutorials.sycnhronization.DistributedTxParticipant;
@@ -15,15 +15,15 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
-public class SetBalanceServiceImpl extends SetBalanceServiceGrpc.SetBalanceServiceImplBase implements DistributedTxListener {
+public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuantityServiceImplBase implements DistributedTxListener {
     private ManagedChannel channel = null;
-    SetBalanceServiceGrpc.SetBalanceServiceBlockingStub clientStub = null;
-    private BankServer server;
+    SetQuantityServiceGrpc.SetQuantityServiceBlockingStub clientStub = null;
+    private InventoryServer server;
 
     private Pair<String, Double> tempDataHolder;
     private boolean transactionStatus = false;
 
-    public SetBalanceServiceImpl(BankServer server) {
+    public SetItemQuantityServiceImpl(InventoryServer server) {
         this.server = server;
     }
 
@@ -44,49 +44,49 @@ public class SetBalanceServiceImpl extends SetBalanceServiceGrpc.SetBalanceServi
     @Override
     public void onGlobalAbort() {
         tempDataHolder = null;
-        System.out.println("Transaction Aborted by theCoordinator");
+        System.out.println("Transaction Aborted by the Coordinator");
     }
 
     @Override
-    public void setBalance(ds.tutorial.communication.grpc.generated.SetBalanceRequest request,
-                           io.grpc.stub.StreamObserver<ds.tutorial.communication.grpc.generated.SetBalanceResponse> responseObserver) {
+    public void setQuantity(ds.tutorial.communication.grpc.generated.SetQuantityRequest request,
+                            io.grpc.stub.StreamObserver<ds.tutorial.communication.grpc.generated.SetQuantityResponse> responseObserver) {
 
-        String accountId = request.getAccountId();
-        double value = request.getValue();
+        String itemId = request.getItemId();
+        double quantity = request.getQuantity();
         if (server.isLeader()) {
             // Act as primary
             try {
-                System.out.println("Updating account balanceas Primary");
-                startDistributedTx(accountId, value);
-                updateSecondaryServers(accountId, value);
+                System.out.println("Updating item quantity: Primary");
+                startDistributedTx(itemId, quantity);
+                updateSecondaryServers(itemId, quantity);
                 System.out.println("going to perform");
-                if (value > 0) {
+                if (quantity > 0) {
                     ((DistributedTxCoordinator) server.getTransaction()).perform();
                 } else {
                     ((DistributedTxCoordinator) server.getTransaction()).sendGlobalAbort();
                 }
             } catch (Exception e) {
-                System.out.println("Error while updating theaccount balance" + e.getMessage());
+                System.out.println("Error while updating the item quantity " + e.getMessage());
                 e.printStackTrace();
             }
         } else {
             // Act As Secondary
             if (request.getIsSentByPrimary()) {
-                System.out.println("Updating account balanceon secondary, on Primary's command");
-                startDistributedTx(accountId, value);
-                if (value != 0.0d) {
+                System.out.println("Updating item quantity on secondary, on Primary's command");
+                startDistributedTx(itemId, quantity);
+                if (quantity != 0.0d) {
                     ((DistributedTxParticipant) server.getTransaction()).voteCommit();
                 } else {
                     ((DistributedTxParticipant) server.getTransaction()).voteAbort();
                 }
             } else {
-                SetBalanceResponse response = callPrimary(accountId, value);
+                SetQuantityResponse response = callPrimary(itemId, quantity);
                 if (response.getStatus()) {
                     transactionStatus = true;
                 }
             }
         }
-        SetBalanceResponse response = SetBalanceResponse.newBuilder().setStatus(transactionStatus).build();
+        SetQuantityResponse response = SetQuantityResponse.newBuilder().setStatus(transactionStatus).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -94,46 +94,46 @@ public class SetBalanceServiceImpl extends SetBalanceServiceGrpc.SetBalanceServi
 
     private void updateBalance() {
         if (tempDataHolder != null) {
-            String accountId = tempDataHolder.getKey();
-            double value = tempDataHolder.getValue();
-            server.setAccountBalance(accountId, value);
-            System.out.println("Account " + accountId + "updated to value " + value + " committed");
+            String itemId = tempDataHolder.getKey();
+            double quantity = tempDataHolder.getValue();
+            server.setAccountBalance(itemId, quantity);
+            System.out.println("Item " + itemId + " updated to quantity " + quantity + " committed");
             tempDataHolder = null;
         }
     }
 
-    private SetBalanceResponse callServer(String accountId, double value, boolean isSentByPrimary, String IPAddress, int port) {
+    private SetQuantityResponse callServer(String itemId, double qty, boolean isSentByPrimary, String IPAddress, int port) {
         System.out.println("Call Server " + IPAddress + ":" + port);
         channel = ManagedChannelBuilder.forAddress(IPAddress, port)
                 .usePlaintext()
                 .build();
-        clientStub = SetBalanceServiceGrpc.newBlockingStub(channel);
+        clientStub = SetQuantityServiceGrpc.newBlockingStub(channel);
 
-        SetBalanceRequest request = SetBalanceRequest
+        SetQuantityRequest request = SetQuantityRequest
                 .newBuilder()
-                .setAccountId(accountId)
-                .setValue(value)
+                .setItemId(itemId)
+                .setQuantity(qty)
                 .setIsSentByPrimary(isSentByPrimary)
                 .build();
-        SetBalanceResponse response = clientStub.setBalance(request);
+        SetQuantityResponse response = clientStub.setQuantity(request);
         return response;
     }
 
-    private SetBalanceResponse callPrimary(String accountId, double value) {
+    private SetQuantityResponse callPrimary(String itemId, double qty) {
         System.out.println("Calling Primary server");
         String[] currentLeaderData = server.getCurrentLeaderData();
         String IPAddress = currentLeaderData[0];
         int port = Integer.parseInt(currentLeaderData[1]);
-        return callServer(accountId, value, false, IPAddress, port);
+        return callServer(itemId, qty, false, IPAddress, port);
     }
 
-    private void updateSecondaryServers(String accountId, double value) throws KeeperException, InterruptedException {
+    private void updateSecondaryServers(String itemId, double qty) throws KeeperException, InterruptedException {
         System.out.println("Updating other servers");
         List<String[]> othersData = server.getOthersData();
         for (String[] data : othersData) {
             String IPAddress = data[0];
             int port = Integer.parseInt(data[1]);
-            callServer(accountId, value, true, IPAddress, port);
+            callServer(itemId, qty, true, IPAddress, port);
         }
     }
 
