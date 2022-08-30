@@ -1,9 +1,9 @@
-package ds.tutorials.communication.server;
+package iit.cw.server;
 
-import ds.tutorials.sycnhronization.DistributedLock;
-import ds.tutorials.sycnhronization.DistributedTx;
-import ds.tutorials.sycnhronization.DistributedTxCoordinator;
-import ds.tutorials.sycnhronization.DistributedTxParticipant;
+import iit.cw.synchronization.DistributedLock;
+import iit.cw.synchronization.DistributedTx;
+import iit.cw.synchronization.DistributedTxCoordinator;
+import iit.cw.synchronization.DistributedTxParticipant;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import org.apache.zookeeper.KeeperException;

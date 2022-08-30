@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>ds.tutorials</groupId>
-    <artifactId>communication-server</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <groupId>cw</groupId>
+    <artifactId>inventory-server</artifactId>
+    <version>version-1</version>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -30,9 +30,9 @@
             <version>1.36.0</version>
         </dependency>
         <dependency>
-            <groupId>ds.tutorials</groupId>
+            <groupId>cw</groupId>
             <artifactId>synchronization-distiruted-lock</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>version-1</version>
         </dependency>
         <dependency>
             <groupId>javax.annotation</groupId>
@@ -84,7 +84,7 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>ds.tutorials.communication.server.InventoryServer</mainClass>
+                            <mainClass>iit.cw.server.InventoryServer</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

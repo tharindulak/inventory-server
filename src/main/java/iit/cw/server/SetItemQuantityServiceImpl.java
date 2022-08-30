@@ -1,11 +1,11 @@
-package ds.tutorials.communication.server;
+package iit.cw.server;
 
 import ds.tutorial.communication.grpc.generated.SetQuantityRequest;
 import ds.tutorial.communication.grpc.generated.SetQuantityResponse;
 import ds.tutorial.communication.grpc.generated.SetQuantityServiceGrpc;
-import ds.tutorials.sycnhronization.DistributedTxCoordinator;
-import ds.tutorials.sycnhronization.DistributedTxListener;
-import ds.tutorials.sycnhronization.DistributedTxParticipant;
+import iit.cw.synchronization.DistributedTxCoordinator;
+import iit.cw.synchronization.DistributedTxListener;
+import iit.cw.synchronization.DistributedTxParticipant;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import javafx.util.Pair;

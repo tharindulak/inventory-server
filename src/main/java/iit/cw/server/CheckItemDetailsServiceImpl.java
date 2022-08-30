@@ -1,4 +1,4 @@
-package ds.tutorials.communication.server;
+package iit.cw.server;
 
 import ds.tutorial.communication.grpc.generated.CheckQuantityResponse;
 import ds.tutorial.communication.grpc.generated.CheckQuantityServiceGrpc;
