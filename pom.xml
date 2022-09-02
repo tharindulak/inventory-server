@@ -35,6 +35,11 @@
             <version>version-1</version>
         </dependency>
         <dependency>
+            <groupId>cw</groupId>
+            <artifactId>name-service-client</artifactId>
+            <version>version-1</version>
+        </dependency>
+        <dependency>
             <groupId>javax.annotation</groupId>
             <artifactId>javax.annotation-api</artifactId>
             <version>1.2</version>

@@ -6,6 +6,7 @@ import iit.cw.synchronization.DistributedTxCoordinator;
 import iit.cw.synchronization.DistributedTxParticipant;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import nameService.NameServiceClient;
 import org.apache.zookeeper.KeeperException;
 
 import java.io.IOException;
@@ -26,6 +27,8 @@ public class InventoryServer {
     private SetItemQuantityServiceImpl setQuantityService;
     private CheckItemDetailsServiceImpl checkQuantityService;
     private OrderItemServiceImpl orderItemService;
+
+    public static final String NAME_SERVICE_ADDRESS = "http://localhost:2379";
 
     public static String buildServerData(String IP, int port) {
         StringBuilder builder = new StringBuilder();
@@ -64,6 +67,8 @@ public class InventoryServer {
                 .addService(orderItemService)
                 .build();
         server.start();
+        NameServiceClient client = new NameServiceClient(NAME_SERVICE_ADDRESS);
+        client.registerService("InventoryService", "127.0.0.1", serverPort, "tcp");
         System.out.println("Inventory system Started and ready to accept requests on port " + serverPort);
 
         tryToBeLeader();
