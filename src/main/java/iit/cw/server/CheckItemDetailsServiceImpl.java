@@ -28,6 +28,6 @@ public class CheckItemDetailsServiceImpl extends CheckQuantityServiceGrpc.CheckQ
     }
 
     private double getItemQuantity(String accountId) {
-        return server.getAccountBalance(accountId);
+        return server.getItemQuantity(accountId);
     }
 }

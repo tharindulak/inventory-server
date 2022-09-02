@@ -29,7 +29,7 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
 
     private void startDistributedTx(String accountId, double value) {
         try {
-            server.getTransaction().start(accountId, String.valueOf(UUID.randomUUID()));
+            server.getQtySetTransaction().start(accountId, String.valueOf(UUID.randomUUID()));
             tempDataHolder = new Pair<>(accountId, value);
         } catch (IOException e) {
             e.printStackTrace();
@@ -38,7 +38,7 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
 
     @Override
     public void onGlobalCommit() {
-        updateBalance();
+        updateQuantity();
     }
 
     @Override
@@ -58,12 +58,16 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
             try {
                 System.out.println("Updating item quantity: Primary");
                 startDistributedTx(itemId, quantity);
-                updateSecondaryServers(itemId, quantity);
+                boolean isSecondaryUpdate = updateSecondaryServers(itemId, quantity);
                 System.out.println("going to perform");
+                boolean isTxPerformed = false;
                 if (quantity > 0) {
-                    ((DistributedTxCoordinator) server.getTransaction()).perform();
+                    isTxPerformed = ((DistributedTxCoordinator) server.getQtySetTransaction()).perform();
                 } else {
-                    ((DistributedTxCoordinator) server.getTransaction()).sendGlobalAbort();
+                    ((DistributedTxCoordinator) server.getQtySetTransaction()).sendGlobalAbort();
+                }
+                if (isTxPerformed && isSecondaryUpdate) {
+                    transactionStatus = true;
                 }
             } catch (Exception e) {
                 System.out.println("Error while updating the item quantity " + e.getMessage());
@@ -75,9 +79,9 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
                 System.out.println("Updating item quantity on secondary, on Primary's command");
                 startDistributedTx(itemId, quantity);
                 if (quantity != 0.0d) {
-                    ((DistributedTxParticipant) server.getTransaction()).voteCommit();
+                    ((DistributedTxParticipant) server.getQtySetTransaction()).voteCommit();
                 } else {
-                    ((DistributedTxParticipant) server.getTransaction()).voteAbort();
+                    ((DistributedTxParticipant) server.getQtySetTransaction()).voteAbort();
                 }
             } else {
                 SetQuantityResponse response = callPrimary(itemId, quantity);
@@ -92,11 +96,11 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
     }
 
 
-    private void updateBalance() {
+    private void updateQuantity() {
         if (tempDataHolder != null) {
             String itemId = tempDataHolder.getKey();
             double quantity = tempDataHolder.getValue();
-            server.setAccountBalance(itemId, quantity);
+            server.setItemQuantity(itemId, quantity);
             System.out.println("Item " + itemId + " updated to quantity " + quantity + " committed");
             tempDataHolder = null;
         }
@@ -127,14 +131,17 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
         return callServer(itemId, qty, false, IPAddress, port);
     }
 
-    private void updateSecondaryServers(String itemId, double qty) throws KeeperException, InterruptedException {
+    private boolean updateSecondaryServers(String itemId, double qty) throws KeeperException, InterruptedException {
         System.out.println("Updating other servers");
         List<String[]> othersData = server.getOthersData();
+        boolean isUpdated = false;
         for (String[] data : othersData) {
             String IPAddress = data[0];
             int port = Integer.parseInt(data[1]);
-            callServer(itemId, qty, true, IPAddress, port);
+            SetQuantityResponse res = callServer(itemId, qty, true, IPAddress, port);
+            isUpdated = res.getStatus();
         }
+        return (othersData.size() == 0 || isUpdated);
     }
 
 }

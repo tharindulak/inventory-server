@@ -21,7 +21,7 @@ public class InventoryServer {
     private byte[] leaderData;
     private int serverPort;
     private Map<String, Double> items = new HashMap();
-    private DistributedTx transaction;
+    private DistributedTx qtySetTransaction;
     private SetItemQuantityServiceImpl setQuantityService;
     private CheckItemDetailsServiceImpl checkQuantityService;
 
@@ -36,11 +36,11 @@ public class InventoryServer {
         leaderLock = new DistributedLock("InventoryServerDisTsx", buildServerData(host, port));
         setQuantityService = new SetItemQuantityServiceImpl(this);
         checkQuantityService = new CheckItemDetailsServiceImpl(this);
-        transaction = new DistributedTxParticipant(setQuantityService);
+        qtySetTransaction = new DistributedTxParticipant(setQuantityService);
     }
 
-    public DistributedTx getTransaction() {
-        return transaction;
+    public DistributedTx getQtySetTransaction() {
+        return qtySetTransaction;
     }
 
     private void tryToBeLeader() throws KeeperException, InterruptedException {
@@ -73,11 +73,11 @@ public class InventoryServer {
         return new String(leaderData).split(":");
     }
 
-    public void setAccountBalance(String accountId, double value) {
+    public void setItemQuantity(String accountId, double value) {
         items.put(accountId, value);
     }
 
-    public double getAccountBalance(String accountId) {
+    public double getItemQuantity(String accountId) {
         Double value = items.get(accountId);
         return (value != null) ? value : 0.0;
     }
@@ -123,7 +123,7 @@ public class InventoryServer {
     private void beTheLeader() {
         System.out.println("I got the leader lock. Now acting as primary");
         isLeader.set(true);
-        transaction = new DistributedTxCoordinator(setQuantityService);
+        qtySetTransaction = new DistributedTxCoordinator(setQuantityService);
     }
 
     public static void main(String[] args) throws Exception {
