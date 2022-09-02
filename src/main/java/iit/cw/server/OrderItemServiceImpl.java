@@ -1,8 +1,6 @@
 package iit.cw.server;
 
-import iit.cw.SetQuantityRequest;
-import iit.cw.SetQuantityResponse;
-import iit.cw.SetQuantityServiceGrpc;
+import iit.cw.*;
 import iit.cw.synchronization.DistributedTxCoordinator;
 import iit.cw.synchronization.DistributedTxListener;
 import iit.cw.synchronization.DistributedTxParticipant;
@@ -15,21 +13,21 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
-public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuantityServiceImplBase implements DistributedTxListener {
+public class OrderItemServiceImpl extends OrderItemServiceGrpc.OrderItemServiceImplBase implements DistributedTxListener {
     private ManagedChannel channel = null;
-    SetQuantityServiceGrpc.SetQuantityServiceBlockingStub clientStub = null;
+    OrderItemServiceGrpc.OrderItemServiceBlockingStub clientStub = null;
     private InventoryServer server;
 
     private Pair<String, Double> tempDataHolder;
     private boolean transactionStatus = false;
 
-    public SetItemQuantityServiceImpl(InventoryServer server) {
+    public OrderItemServiceImpl(InventoryServer server) {
         this.server = server;
     }
 
     private void startDistributedTx(String accountId, double value) {
         try {
-            server.getQtySetTransaction().start(accountId, String.valueOf(UUID.randomUUID()));
+            server.getOrderItemTransaction().start(accountId, String.valueOf(UUID.randomUUID()));
             tempDataHolder = new Pair<>(accountId, value);
         } catch (IOException e) {
             e.printStackTrace();
@@ -38,7 +36,7 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
 
     @Override
     public void onGlobalCommit() {
-        updateQuantity();
+        placeItemOrder();
     }
 
     @Override
@@ -48,23 +46,22 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
     }
 
     @Override
-    public void setQuantity(iit.cw.SetQuantityRequest request,
-                            io.grpc.stub.StreamObserver<iit.cw.SetQuantityResponse> responseObserver) {
+    public void orderItem(OrderItemRequest request, io.grpc.stub.StreamObserver<OrderItemResponse> responseObserver) {
 
         String itemId = request.getItemId();
         double quantity = request.getQuantity();
         if (server.isLeader()) {
             // Act as primary
             try {
-                System.out.println("Updating item quantity: Primary");
+                System.out.println("Ordering the item: Primary");
                 startDistributedTx(itemId, quantity);
                 boolean isSecondaryUpdate = updateSecondaryServers(itemId, quantity);
                 System.out.println("going to perform");
                 boolean isTxPerformed = false;
                 if (quantity > 0) {
-                    isTxPerformed = ((DistributedTxCoordinator) server.getQtySetTransaction()).perform();
+                    isTxPerformed = ((DistributedTxCoordinator) server.getOrderItemTransaction()).perform();
                 } else {
-                    ((DistributedTxCoordinator) server.getQtySetTransaction()).sendGlobalAbort();
+                    ((DistributedTxCoordinator) server.getOrderItemTransaction()).sendGlobalAbort();
                 }
                 if (isTxPerformed && isSecondaryUpdate) {
                     transactionStatus = true;
@@ -79,51 +76,52 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
                 System.out.println("Updating item quantity on secondary, on Primary's command");
                 startDistributedTx(itemId, quantity);
                 if (quantity != 0.0d) {
-                    ((DistributedTxParticipant) server.getQtySetTransaction()).voteCommit();
+                    ((DistributedTxParticipant) server.getOrderItemTransaction()).voteCommit();
                 } else {
-                    ((DistributedTxParticipant) server.getQtySetTransaction()).voteAbort();
+                    ((DistributedTxParticipant) server.getOrderItemTransaction()).voteAbort();
                 }
             } else {
-                SetQuantityResponse response = callPrimary(itemId, quantity);
+                OrderItemResponse response = callPrimary(itemId, quantity);
                 if (response.getStatus()) {
                     transactionStatus = true;
                 }
             }
         }
-        SetQuantityResponse response = SetQuantityResponse.newBuilder().setStatus(transactionStatus).build();
+        OrderItemResponse response = OrderItemResponse.newBuilder().setStatus(transactionStatus).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
 
-    private void updateQuantity() {
+    private void placeItemOrder() {
         if (tempDataHolder != null) {
             String itemId = tempDataHolder.getKey();
             double quantity = tempDataHolder.getValue();
-            server.setItemQuantity(itemId, quantity);
-            System.out.println("Item " + itemId + " updated to quantity " + quantity + " committed");
+            double remainingQty = server.getItemQuantity(itemId) - quantity;
+            server.setItemQuantity(itemId, remainingQty);
+            System.out.println("Order placed for " + itemId + " with a quantity of " + quantity + ".");
             tempDataHolder = null;
         }
     }
 
-    private SetQuantityResponse callServer(String itemId, double qty, boolean isSentByPrimary, String IPAddress, int port) {
+    private OrderItemResponse callServer(String itemId, double qty, boolean isSentByPrimary, String IPAddress, int port) {
         System.out.println("Call Server " + IPAddress + ":" + port);
         channel = ManagedChannelBuilder.forAddress(IPAddress, port)
                 .usePlaintext()
                 .build();
-        clientStub = SetQuantityServiceGrpc.newBlockingStub(channel);
+        clientStub = OrderItemServiceGrpc.newBlockingStub(channel);
 
-        SetQuantityRequest request = SetQuantityRequest
+        OrderItemRequest request = OrderItemRequest
                 .newBuilder()
                 .setItemId(itemId)
                 .setQuantity(qty)
                 .setIsSentByPrimary(isSentByPrimary)
                 .build();
-        SetQuantityResponse response = clientStub.setQuantity(request);
+        OrderItemResponse response = clientStub.orderItem(request);
         return response;
     }
 
-    private SetQuantityResponse callPrimary(String itemId, double qty) {
+    private OrderItemResponse callPrimary(String itemId, double qty) {
         System.out.println("Calling Primary server");
         String[] currentLeaderData = server.getCurrentLeaderData();
         String IPAddress = currentLeaderData[0];
@@ -138,7 +136,7 @@ public class SetItemQuantityServiceImpl extends SetQuantityServiceGrpc.SetQuanti
         for (String[] data : othersData) {
             String IPAddress = data[0];
             int port = Integer.parseInt(data[1]);
-            SetQuantityResponse res = callServer(itemId, qty, true, IPAddress, port);
+            OrderItemResponse res = callServer(itemId, qty, true, IPAddress, port);
             isUpdated = res.getStatus();
         }
         return (othersData.size() == 0 || isUpdated);

@@ -22,8 +22,10 @@ public class InventoryServer {
     private int serverPort;
     private Map<String, Double> items = new HashMap();
     private DistributedTx qtySetTransaction;
+    private DistributedTx orderTransaction;
     private SetItemQuantityServiceImpl setQuantityService;
     private CheckItemDetailsServiceImpl checkQuantityService;
+    private OrderItemServiceImpl orderItemService;
 
     public static String buildServerData(String IP, int port) {
         StringBuilder builder = new StringBuilder();
@@ -35,12 +37,18 @@ public class InventoryServer {
         this.serverPort = port;
         leaderLock = new DistributedLock("InventoryServerDisTsx", buildServerData(host, port));
         setQuantityService = new SetItemQuantityServiceImpl(this);
+        orderItemService = new OrderItemServiceImpl(this);
         checkQuantityService = new CheckItemDetailsServiceImpl(this);
         qtySetTransaction = new DistributedTxParticipant(setQuantityService);
+        orderTransaction = new DistributedTxParticipant(orderItemService);
     }
 
     public DistributedTx getQtySetTransaction() {
         return qtySetTransaction;
+    }
+
+    public DistributedTx getOrderItemTransaction() {
+        return orderTransaction;
     }
 
     private void tryToBeLeader() throws KeeperException, InterruptedException {
@@ -53,6 +61,7 @@ public class InventoryServer {
                 .forPort(serverPort)
                 .addService(checkQuantityService)
                 .addService(setQuantityService)
+                .addService(orderItemService)
                 .build();
         server.start();
         System.out.println("Inventory system Started and ready to accept requests on port " + serverPort);
@@ -124,6 +133,7 @@ public class InventoryServer {
         System.out.println("I got the leader lock. Now acting as primary");
         isLeader.set(true);
         qtySetTransaction = new DistributedTxCoordinator(setQuantityService);
+        orderTransaction = new DistributedTxCoordinator(orderItemService);
     }
 
     public static void main(String[] args) throws Exception {

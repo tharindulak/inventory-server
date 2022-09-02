@@ -1,7 +1,7 @@
 package iit.cw.server;
 
-import ds.tutorial.communication.grpc.generated.CheckQuantityResponse;
-import ds.tutorial.communication.grpc.generated.CheckQuantityServiceGrpc;
+import iit.cw.CheckQuantityResponse;
+import iit.cw.CheckQuantityServiceGrpc;
 
 public class CheckItemDetailsServiceImpl extends CheckQuantityServiceGrpc.CheckQuantityServiceImplBase {
 
@@ -12,8 +12,8 @@ public class CheckItemDetailsServiceImpl extends CheckQuantityServiceGrpc.CheckQ
     }
 
     @Override
-    public void checkQuantity(ds.tutorial.communication.grpc.generated.CheckQuantityRequest request,
-                              io.grpc.stub.StreamObserver<ds.tutorial.communication.grpc.generated.CheckQuantityResponse> responseObserver) {
+    public void checkQuantity(iit.cw.CheckQuantityRequest request,
+                              io.grpc.stub.StreamObserver<iit.cw.CheckQuantityResponse> responseObserver) {
 
         String itemId = request.getItemId();
         System.out.println("Request received..");
