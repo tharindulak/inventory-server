@@ -55,7 +55,7 @@ public class OrderItemServiceImpl extends OrderItemServiceGrpc.OrderItemServiceI
             try {
                 System.out.println("Ordering the item: Primary");
                 startDistributedTx(itemId, quantity);
-                boolean isSecondaryUpdate = updateSecondaryServers(itemId, quantity);
+                updateSecondaryServers(itemId, quantity);
                 System.out.println("going to perform");
                 boolean isTxPerformed = false;
                 if (quantity > 0) {
@@ -63,7 +63,7 @@ public class OrderItemServiceImpl extends OrderItemServiceGrpc.OrderItemServiceI
                 } else {
                     ((DistributedTxCoordinator) server.getOrderItemTransaction()).sendGlobalAbort();
                 }
-                if (isTxPerformed && isSecondaryUpdate) {
+                if (isTxPerformed) {
                     transactionStatus = true;
                 }
             } catch (Exception e) {
@@ -129,17 +129,14 @@ public class OrderItemServiceImpl extends OrderItemServiceGrpc.OrderItemServiceI
         return callServer(itemId, qty, false, IPAddress, port);
     }
 
-    private boolean updateSecondaryServers(String itemId, double qty) throws KeeperException, InterruptedException {
+    private void updateSecondaryServers(String itemId, double qty) throws KeeperException, InterruptedException {
         System.out.println("Updating other servers");
         List<String[]> othersData = server.getOthersData();
-        boolean isUpdated = false;
         for (String[] data : othersData) {
             String IPAddress = data[0];
             int port = Integer.parseInt(data[1]);
             OrderItemResponse res = callServer(itemId, qty, true, IPAddress, port);
-            isUpdated = res.getStatus();
         }
-        return (othersData.size() == 0 || isUpdated);
     }
 
 }
